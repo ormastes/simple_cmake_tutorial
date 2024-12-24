@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\dev\simple_cmake_tutorial\9.Variable_Cache_and_Precedence\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\dev\simple_cmake_tutorial\9.Variable_Cache_and_Precedence\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{CCB21003-9D2B-3BB0-A389-D421B90E732E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

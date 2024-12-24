@@ -1,0 +1,5 @@
+#pragma once
+#define HELLO_TO "@HELLO_TO@"
+
+// For on off define. it will be not defined if it is off
+// #cmakedefine01 HELLO_OPTION

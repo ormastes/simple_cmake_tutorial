@@ -1,0 +1,4 @@
+C:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line/CMakeFiles/my_app.dir
+C:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line/CMakeFiles/ALL_BUILD.dir
+C:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line/CMakeFiles/ZERO_CHECK.dir
+C:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line/lib/CMakeFiles/mylib.dir

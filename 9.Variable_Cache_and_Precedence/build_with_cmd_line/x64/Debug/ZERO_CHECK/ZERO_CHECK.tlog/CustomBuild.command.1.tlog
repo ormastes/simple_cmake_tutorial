@@ -1,0 +1,10 @@
+^C:\DEV\SIMPLE_CMAKE_TUTORIAL\9.VARIABLE_CACHE_AND_PRECEDENCE\BUILD_WITH_CMD_LINE\CMAKEFILES\FA6CD7F0DD826AEAD6CF12992D47BFEA\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence -BC:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/dev/simple_cmake_tutorial/9.Variable_Cache_and_Precedence/build_with_cmd_line/VariablePrecedenceExample.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
