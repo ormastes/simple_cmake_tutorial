@@ -502,6 +502,8 @@ int main() {
 ### Purpose
 Understand how CMake handles variables from different sources and their precedence order to effectively manage build configurations.
 
+Notice: Do not overwrite a varaible with same name unless it is just add an elemente on list. In other word, let script do not depend on "Precedence."
+
 ### Variable Types and Precedence
 Variables affect the current scope and its children from where they are defined unless PARENT_SCOPE is used, which alters a parent variable.
 

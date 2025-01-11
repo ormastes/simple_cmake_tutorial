@@ -502,6 +502,8 @@ int main() {
 ### Purpose
 다양한 소스의 변수들과 그들의 우선순위 순서를 CMake가 어떻게 처리하는지 이해하여 빌드 구성을 효과적으로 관리합니다.
 
+주의: 단순 List에 값추가가 아니면 같은 변수 이름으로 Overwrite하지 않는다. 즉 Precedence를 고려할 필요가 없도록 한다.
+
 ### Variable Types and Precedence
 변수는 PARENT_SCOPE를 사용하여 상위 변수를 변경하지 않는 한, 정의된 현재 범위와 그 하위 범위에 영향을 미칩니다.
 
