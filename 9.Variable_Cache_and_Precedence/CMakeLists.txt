@@ -36,7 +36,10 @@ message("After add_subdirectory: HELLO_TO = ${HELLO_TO}")
 
 # Build an executable that depends on mylib
 add_executable(my_app main.cpp)
-target_link_libraries(my_app PRIVATE mylib)
+target_link_libraries(my_app 
+PRIVATE 
+    mylib
+)
 
 # Make build VERBOSE
 set(CMAKE_VERBOSE_MAKEFILE ON)

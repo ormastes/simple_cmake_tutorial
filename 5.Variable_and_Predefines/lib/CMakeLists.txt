@@ -2,4 +2,7 @@
 add_library(mylib STATIC mylib.cpp mylib.h)
 
 # Optionally, set include paths for this library
-target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(mylib 
+PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)

@@ -11,10 +11,16 @@
 8. [Include File (.cmake)](#8-include-file-cmake)
 9. [Variable Cache And Precedence](#9-variable-cache-and-precedence)
 
+[Appendix 1. How call subdirectory](#appendix-1-how-call-subdirectory)
+
 ## 1. Hello World (Executable Target)
 
 ### Purpose
 가장 간단한 CMake 프로젝트인 "Hello World" 실행 파일을 만드는 방법을 배웁니다.
+
+CMake는 고수준 빌드 스크립트 언어입니다. 다른 고수준 프로그래밍 언어와 유사하게, 사용하기 전에 프로그래밍 언어의 컴파일 단계와 비슷한 설정(Configuration) 단계가 필요합니다. 이 단계는 환경과 캐시 변수를 설정하기 때문에 "Configure" 또는 "Cache Configuration step"라고 불립니다. 설정(configuration) 과정에서 CMake는 빌드 스크립트 실행 파일, 도구, 라이브러리의 일반적인 위치를 자동으로 검색합니다. 이러한 위치는 수동으로도 설정할 수 있습니다.
+Make, Ninja, MSBuild와 같은 저수준 빌드 시스템은 직접 사용하거나 CMake를 통해 최종 바이너리를 생성하는 데 사용될 수 있습니다.
+(개인적으로 별다른 이유가 없으면 Module을 많이 습니다.)
 
 ### Example Structure
 ```
@@ -37,11 +43,14 @@ int main() {
 ```cmake
 cmake_minimum_required(VERSION 3.10)
 
-# 1) Define project name
+# Define project name
 project(HelloWorldProject)
 
-# 2) Create executable target named "hello_world"
+# Create executable target named "hello_world"
 add_executable(hello_world main.cpp)
+
+# Make build VERBOSE
+set(CMAKE_VERBOSE_MAKEFILE ON)
 ```
 
 ### How to Build
@@ -78,6 +87,25 @@ cmake --build .
 ### Purpose
 라이브러리와 실행 파일을 모두 포함하는 프로젝트를 구성하는 방법을 배웁니다. 이 예제는 `add_subdirectory`를 사용하여 빌드에 라이브러리를 포함하는 방법을 보여줍니다.
 
+CMake는 CMakeLists.txt 파일을 포함하는 디렉토리를 모듈로 처리할 수 있습니다. 각 모듈은 사용자를 위한 공용 include 경로나 다른 필요한 속성들을 선언할 수 있으며, target_link_libraries()를 사용하는 것만으로도 타겟 사용자의 include 경로와 속성 설정을 자동화할 수 있습니다.
+
+더 자세히 설명하면:
+- 각 모듈(라이브러리)은 자신만의 CMakeLists.txt를 가질 수 있습니다
+- 모듈은 PUBLIC으로 include 경로를 선언하여 사용자에게 자동으로 전파할 수 있습니다
+- target_link_libraries()를 사용하면 라이브러리의 모든 PUBLIC 설정이 자동으로 전파됩니다
+- 이를 통해 라이브러리 사용자는 별도의 include 경로 설정 없이도 라이브러리를 사용할 수 있습니다
+예시:
+```cmake
+# lib/CMakeLists.txt
+add_library(mylib STATIC mylib.cpp)
+target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+```
+```cmake
+# Toplevel CMakeLists.txt
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE mylib)  # mylib의 include 경로가 자동으로 my_app에 전파됨
+```
+
 ### Example Structure
 ```
 subdirectory_example/
@@ -91,11 +119,26 @@ subdirectory_example/
 
 ### lib/CMakeLists.txt
 ```cmake
-# Build a static library named mylib
-add_library(mylib STATIC mylib.cpp)
+# Build a static library named mylib. Notice that interface header files are included in the library target.
+add_library(mylib 
+STATIC 
+    mylib.cpp 
+    mylib.h
+)
+# Included header file help
+## 1. Dependency tracking whenever header file changes cause user of this library to recompile. (Ninja seems depency tracking pretty well even without this but it is better to provide this information)
+## 2. IDEs can use this information to provide code completion.
 
-# Optionally, set include paths for this library
-target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# Add include path which for itself and user of this library can use.
+target_include_directories(mylib
+# PRIVATE # It is better to include only one PRIVATE directory.
+#     ${CMAKE_CURRENT_SOURCE_DIR}
+PUBLIC  # it is better to include only one PUBLIC directory.
+#    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+    ${CMAKE_CURRENT_SOURCE_DIR}/dummy_inc # User also may include this directory. So, limit the PUBLIC scope only to a directory.
+)
+# All of the include directories are added to the include path of the target.
 ```
 
 ### lib/mylib.cpp
@@ -106,8 +149,6 @@ void print_mylib() {
     std::cout << "Hello World!" << std::endl;
 }
 ```
-
-*(해당하는 `mylib.h`는 함수 선언을 포함할 것입니다)*
 
 ### Top-Level CMakeLists.txt
 ```cmake
@@ -156,7 +197,10 @@ project(CMake_Script_Along_With_Sources)
 # Build an executable
 add_executable(my_app main.cpp lib/mylib.cpp)
 
-target_include_directories(my_app PRIVATE lib)
+target_link_libraries(my_app 
+PRIVATE 
+    mylib
+)
 
 # Make build VERBOSE
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -229,6 +273,17 @@ message("The value of MY_VAR is: ${MY_VAR}")
 ### Purpose
 PRIVATE, PUBLIC 및 INTERFACE 지정을 사용하여 헤더 가시성과 include 경로를 관리하는 방법을 배웁니다.
 
+Subdirectory target에서 단하나의 PRIVATE 디랙토리 ${CMAKE_CURRENT_SOURCE_DIR}와 PRIVATE 디랙토리를 포함하지 않는 ${CMAKE_CURRENT_SOURCE_DIR}/include 과 같은 PUBLIC 디랙토리 하나만을 가지도록 하는 것이 보다 좋은 디자인이 될 수 있다다.
+Example:
+```cmake
+target_include_directories(myTarget
+PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+PUBLIC  
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+```
+
 ### Example with Private Header Available to User
 #### Structure 1
 ```
@@ -275,16 +330,18 @@ subdirectory_example/
 ```
 
 #### lib/CMakeLists.txt
+다음은 이상적인 include 경로 설정을 나타냅니다. Root와 Public 경로에 없는 다른 헤더 파일들을 include하여야 하는 경우 모듈의 루트로부터의 경로를 사용하여 include 되어야 합니다.
+
 ```cmake
 # Build a static library named mylib. Notice that interface header files are included in the library target.
 add_library(mylib STATIC mylib.cpp include/mylib.h)
 
 # Include path for PRIVATE and PUBLIC
 target_include_directories(mylib 
-    PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR} 
-    PUBLIC 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 ```
 ##### lib/include/mylib.h
@@ -303,6 +360,8 @@ target_include_directories(my_header_only_lib INTERFACE ${CMAKE_CURRENT_SOURCE_D
 
 ### Purpose
 함수와 매크로를 사용하여 재사용 가능한 CMake 코드를 작성하는 방법을 숙달합니다. 함수 스코프(로컬)와 매크로 스코프(호출자의 스코프)의 차이를 이해하는 것이 중요합니다.
+
+특별한 이유가 있지 않는 이상 function을 사용하는 것이 macro를 사용하는 것보다 좋습니다. 종종  macro에서 caller의 variable을 update하는 것이 쉬우며 이런 상황은 macro사용이 정당화 될 수 있는 상황입니다.
 
 ### Example Structure
 ```
@@ -599,3 +658,107 @@ After add_subdirectory: HELLO_TO = From Command Line
 5. **포함된 파일 변수**
    - 포함은 임베딩과 동일합니다.
    - 포함된 파일의 변경사항이 현재 'CMakeLists.txt'의 변수에 영향을 미칩니다.
+
+
+## 부록 1. Subdirectory를 무엇이라 부를까?
+CMake에서 프로젝트의 서브디렉토리는 일반적으로 전체 프로젝트 내에서의 역할이나 구조에 따라 지칭됩니다. 엄격한 통일된 용어는 없지만, 다음과 같은 용어들이 일반적으로 사용됩니다:
+(개인적으로 특별한 의미가 없을 땐 Module이란 말을 많이 씁씁니다.)
+---
+
+### **1. 모듈(Module)**
+   - **사용**: 서브디렉토리는 프로젝트의 논리적으로 독립된 부분을 나타내는 경우 흔히 "모듈"이라고 불립니다. 주로 재사용하거나 독립적으로 연결할 수 있는 기능을 캡슐화합니다.
+   - **특징**:
+     - 자체 `CMakeLists.txt`를 포함하는 경우가 많음
+     - 라이브러리(`STATIC`, `SHARED`, 또는 `OBJECT`)로 빌드됨
+     - 프로젝트의 다른 부분에서 의존성으로 사용됨
+   - 예시:
+     ```
+     src/
+       core/
+         CMakeLists.txt  # 'core' 모듈 정의
+       utils/
+         CMakeLists.txt  # 'utils' 모듈 정의
+     ```
+
+---
+
+### **2. 패키지(Package)**
+   - **사용**: 더 큰 규모나 다중 프로젝트 설정에서 더 일반적이며, 서브디렉토리는 함께 배포되는 독립형 라이브러리, 실행 파일 또는 리소스 모음을 제공하는 경우 "패키지"로 지칭될 수 있습니다.
+   - **특징**:
+     - 여러 라이브러리나 실행 파일을 포함할 수 있음
+     - `CMake`를 통해 설치 가능한 컴포넌트를 만들 때 자주 사용됨
+   - 예시:
+     ```
+     packages/
+       logging/
+         CMakeLists.txt  # 'logging' 패키지 정의
+       network/
+         CMakeLists.txt  # 'network' 패키지 정의
+     ```
+
+---
+
+### **3. 컴포넌트(Component)**
+   - **사용**: "모듈"과 때때로 호환되어 사용되지만, 선택적 기능이나 서브모듈이 있는 프로젝트에 더 특화되어 있습니다.
+   - **특징**:
+     - CMake 옵션(`-DBUILD_COMPONENT_X=ON`)과 if() 문을 통해 활성화하거나 비활성화할 수 있는 프로젝트의 선택적 부분을 나타낼 때 "컴포넌트"라고 부릅니다.
+   - 예시:
+     ```
+     components/
+       CMakeLists.txt # UI 컴포넌트
+       gui/
+         CMakeLists.txt  # GUI 컴포넌트
+       cli/
+         CMakeLists.txt  # CLI 컴포넌트
+     ```
+     ```cmake
+    # components/CMakeLists.txt
+    option(BUILD_COMPONENT_X "X 컴포넌트 빌드" ON) # 보통 루트 CMakeLists.txt에 위치
+    # 루트 CMakeLists.txt에서
+    if (BUILD_COMPONENT_X)
+        add_subdirectory(components/X)
+    endif()
+    ```
+
+---
+
+### **4. 서브프로젝트(Subproject)**
+   - **사용**: 서브디렉토리가 자체 완전한 빌드 시스템을 가지고 있고 더 큰 프로젝트 내에서 독립적인 단위로 취급되는 경우 "서브프로젝트"로 지칭됩니다.
+   - **특징**:
+     - 루트에 자체 `CMakeLists.txt`를 포함
+     - 독립적으로 빌드되거나 `add_subdirectory()`를 통해 포함될 수 있음
+   - 예시:
+     ```
+     projects/
+       mylib/
+         CMakeLists.txt  # 독립적인 서브프로젝트
+       myapp/
+         CMakeLists.txt  # 또 다른 독립적인 서브프로젝트
+     ```
+
+---
+
+### **5. 라이브러리(Library)**
+   - **사용**: 서브디렉토리의 주요 역할이 라이브러리를 정의하고 빌드하는 것이라면, 흔히 그냥 "라이브러리"라고 부릅니다.
+   - **특징**:
+     - 일반적으로 `STATIC` 또는 `SHARED` 라이브러리로 빌드됨
+     - 프로젝트의 다른 부분에서 `target_link_libraries()`를 통해 사용됨
+   - 예시:
+     ```
+     libs/
+       math/
+         CMakeLists.txt  # 수학 라이브러리
+       graphics/
+         CMakeLists.txt  # 그래픽스 라이브러리
+     ```
+
+---
+
+### **어떤 용어를 사용할까요?**
+- **"모듈" 사용**: 서브디렉토리가 프로젝트의 논리적 부분을 나타내는 경우 (내부 프로젝트에서 일반적)
+- **"패키지" 사용**: 서브디렉토리가 독립형 컴포넌트로 배포되거나 설치되는 경우
+- **"컴포넌트" 사용**: 서브디렉토리를 선택적으로 포함/제외할 수 있는 경우
+- **"서브프로젝트" 사용**: 서브디렉토리가 독립적이며 별도로 빌드될 수 있는 경우
+- **"라이브러리" 사용**: 서브디렉토리가 주로 라이브러리를 만드는 것이 목적인 경우
+
+구체적인 용어는 종종 프로젝트의 구성, 팀의 선호도 또는 프로젝트의 도메인에 따라 달라집니다.

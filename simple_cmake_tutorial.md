@@ -11,10 +11,16 @@
 8. [Include File (.cmake)](#8-include-file-cmake)
 9. [Variable Cache And Precedence](#9-variable-cache-and-precedence)
 
+[Appendix 1. How call subdirectory](#appendix-1-how-call-subdirectory)
+
 ## 1. Hello World (Executable Target)
 
 ### Purpose
 Learn how to create the simplest possible CMake project - a "Hello World" executable.
+
+CMake is a high-level build script language. Similarly to other high-level programming languages, it requires a configuration step before use, which is analogous to the compilation step in programming languages. This step is called "Configure" or "Cache Configuration step" because it sets up the environment and cache variables. During configuration, CMake automatically searches well-known locations for build script executables, tools, and libraries. These locations can also be set manually.
+Low-level build systems such as Make, Ninja, or MSBuild can be used either directly or through CMake to generate the final binary.
+(Personally, I use Module often when it does not have specific context.)
 
 ### Example Structure
 ```
@@ -37,11 +43,14 @@ int main() {
 ```cmake
 cmake_minimum_required(VERSION 3.10)
 
-# 1) Define project name
+# Define project name
 project(HelloWorldProject)
 
-# 2) Create executable target named "hello_world"
+# Create executable target named "hello_world"
 add_executable(hello_world main.cpp)
+
+# Make build VERBOSE
+set(CMAKE_VERBOSE_MAKEFILE ON)
 ```
 
 ### How to Build
@@ -78,6 +87,25 @@ This builds using the generated build files in the current directory.
 ### Purpose
 Learn how to structure a project that includes both a library and an executable. This example demonstrates using `add_subdirectory` to incorporate a library into your build.
 
+CMake can handle modules as directories containing a CMakeLists.txt file. Each module can declare its public include path or other required properties for its user, automating the target user's include path and property settings by just using target_link_libraries().
+
+To explain in more detail:
+- Each module (library) can have its own CMakeLists.txt
+- Modules can declare include paths as PUBLIC to automatically propagate to users
+- Using target_link_libraries() automatically propagates all PUBLIC settings from the library
+- This allows library users to use the library without manual include path settings
+Example:
+```cmake
+# lib/CMakeLists.txt
+add_library(mylib STATIC mylib.cpp)
+target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+```
+```cmake
+# Toplevel CMakeLists.txt
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE mylib)  # mylib의 include 경로가 자동으로 my_app에 전파됨
+```
+
 ### Example Structure
 ```
 subdirectory_example/
@@ -91,11 +119,26 @@ subdirectory_example/
 
 ### lib/CMakeLists.txt
 ```cmake
-# Build a static library named mylib
-add_library(mylib STATIC mylib.cpp)
+# Build a static library named mylib. Notice that interface header files are included in the library target.
+add_library(mylib 
+STATIC 
+    mylib.cpp 
+    mylib.h
+)
+# Included header file help
+## 1. Dependency tracking whenever header file changes cause user of this library to recompile. (Ninja seems depency tracking pretty well even without this but it is better to provide this information)
+## 2. IDEs can use this information to provide code completion.
 
-# Optionally, set include paths for this library
-target_include_directories(mylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+# Add include path which for itself and user of this library can use.
+target_include_directories(mylib
+# PRIVATE # It is better to include only one PRIVATE directory.
+#     ${CMAKE_CURRENT_SOURCE_DIR}
+PUBLIC  # it is better to include only one PUBLIC directory.
+#    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+    ${CMAKE_CURRENT_SOURCE_DIR}/dummy_inc # User also may include this directory. So, limit the PUBLIC scope only to a directory.
+)
+# All of the include directories are added to the include path of the target.
 ```
 
 ### lib/mylib.cpp
@@ -106,8 +149,6 @@ void print_mylib() {
     std::cout << "Hello World!" << std::endl;
 }
 ```
-
-*(A corresponding `mylib.h` would contain the function declarations)*
 
 ### Top-Level CMakeLists.txt
 ```cmake
@@ -156,7 +197,10 @@ project(CMake_Script_Along_With_Sources)
 # Build an executable
 add_executable(my_app main.cpp lib/mylib.cpp)
 
-target_include_directories(my_app PRIVATE lib)
+target_link_libraries(my_app 
+PRIVATE 
+    mylib
+)
 
 # Make build VERBOSE
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -229,6 +273,17 @@ message("The value of MY_VAR is: ${MY_VAR}")
 ### Purpose
 Learn how to manage header visibility and include paths using PRIVATE, PUBLIC, and INTERFACE specifications.
 
+In subdirecotry target, It is better to include only one PRIVATE directory which point ${CMAKE_CURRENT_SOURCE_DIR} and one PUBLIC directory which not include PRIVATE directory such as ${CMAKE_CURRENT_SOURCE_DIR}/include.
+Example:
+```cmake
+target_include_directories(myTarget
+PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+PUBLIC  
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+```
+
 ### Example with Private Header Available to User
 #### Structure 1
 ```
@@ -275,16 +330,18 @@ subdirectory_example/
 ```
 
 #### lib/CMakeLists.txt
+This represent ideal include path setting. When other header files which is not on Root and Public path should included, it should be included with path from the root of the module.
+
 ```cmake
 # Build a static library named mylib. Notice that interface header files are included in the library target.
 add_library(mylib STATIC mylib.cpp include/mylib.h)
 
 # Include path for PRIVATE and PUBLIC
 target_include_directories(mylib 
-    PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR} 
-    PUBLIC 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 ```
 ##### lib/include/mylib.h
@@ -303,6 +360,8 @@ target_include_directories(my_header_only_lib INTERFACE ${CMAKE_CURRENT_SOURCE_D
 
 ### Purpose
 Master the creation of reusable CMake code using functions and macros. Understanding the difference between function scope (local) and macro scope (caller's scope) is crucial.
+
+Unless there is specific reason, it is better to use function over macro. Often caller variable updates can be easily implementedin macro rather than function and it is the situation where the macro usage can be justified.
 
 ### Example Structure
 ```
@@ -599,3 +658,106 @@ After add_subdirectory: HELLO_TO = From Command Line
 5. **Included File Variables**
    - Inclusion is equivalent to embedding.
    - Changes in the included file affect variables in the current 'CMakeLists.txt'.
+
+
+## Appendix 1. How call subdirectory
+In CMake, subdirectories in a project are typically referred to based on their role or how they are structured within the overall project. While there is no strict universal terminology, the following terms are commonly used:
+
+---
+
+### **1. Module**
+   - **Usage**: A subdirectory is often called a "module" if it represents a logically self-contained part of the project, typically encapsulating functionality that can be reused or linked independently.
+   - **Characteristics**:
+     - Often contains its own `CMakeLists.txt`.
+     - Builds into a library (`STATIC`, `SHARED`, or `OBJECT`).
+     - Used by other parts of the project as a dependency.
+   - Example:
+     ```
+     src/
+       core/
+         CMakeLists.txt  # Defines the 'core' module
+       utils/
+         CMakeLists.txt  # Defines the 'utils' module
+     ```
+
+---
+
+### **2. Package**
+   - **Usage**: More common in larger or multi-project setups, a subdirectory may be referred to as a "package" if it provides a standalone collection of libraries, executables, or resources that are distributed together.
+   - **Characteristics**:
+     - May include multiple libraries or executables.
+     - Often used when creating installable components via `CMake`.
+   - Example:
+     ```
+     packages/
+       logging/
+         CMakeLists.txt  # Defines the 'logging' package
+       network/
+         CMakeLists.txt  # Defines the 'network' package
+     ```
+
+---
+
+### **3. Component**
+   - **Usage**: Sometimes used interchangeably with "module," but more specific to projects with optional features or submodules.
+   - **Characteristics**:
+     - A subdirectory is called a "component" when it represents an optional part of the project, potentially enabled or disabled via CMake options (`-DBUILD_COMPONENT_X=ON`) with if() statement.
+   - Example:
+     ```
+     components/
+       CMakeLists.txt # UI component
+       gui/
+         CMakeLists.txt  # GUI component
+       cli/
+         CMakeLists.txt  # CLI component
+     ```
+     ```cmake
+    # components/CMakeLists.txt
+    option(BUILD_COMPONENT_X "Build the X component" ON) // usually on root CMakeLists.txt
+    # In the root CMakeLists.txt
+    if (BUILD_COMPONENT_X)
+        add_subdirectory(components/X)
+    endif()
+    ```
+---
+
+### **4. Subproject**
+   - **Usage**: A subdirectory is often referred to as a "subproject" if it has its own complete build system and is treated as an independent unit within a larger project.
+   - **Characteristics**:
+     - Contains its own `CMakeLists.txt` at the root.
+     - Can often be built independently or included via `add_subdirectory()`.
+   - Example:
+     ```
+     projects/
+       mylib/
+         CMakeLists.txt  # Independent subproject
+       myapp/
+         CMakeLists.txt  # Another independent subproject
+     ```
+
+---
+
+### **5. Library**
+   - **Usage**: If a subdirectory's primary role is to define and build a library, it's often just called a "library."
+   - **Characteristics**:
+     - Typically builds into a `STATIC` or `SHARED` library.
+     - Used via `target_link_libraries()` by other parts of the project.
+   - Example:
+     ```
+     libs/
+       math/
+         CMakeLists.txt  # Math library
+       graphics/
+         CMakeLists.txt  # Graphics library
+     ```
+
+---
+
+### **Which Term to Use?**
+- **Use "module"**: If the subdirectory represents a logical part of the project (common in internal projects).
+- **Use "package"**: If the subdirectory is distributed or installed as a standalone component.
+- **Use "component"**: If the subdirectory can be optionally included/excluded.
+- **Use "subproject"**: If the subdirectory is independent and could be built separately.
+- **Use "library"**: If the subdirectory is primarily for creating a library.
+
+The specific terminology often depends on the project's organization, team preferences, or the project's domain.

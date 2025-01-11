@@ -3,8 +3,8 @@ add_library(mylib STATIC mylib.cpp include/mylib.h)
 
 # Include path for PRIAVATE and PUBLIC
 target_include_directories(mylib 
-    PRIVATE 
-        ${CMAKE_CURRENT_SOURCE_DIR} 
-    PUBLIC 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
